@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-import numpy as np
 
 # Set page to wide mode
 st.set_page_config(layout="wide")
@@ -21,9 +20,6 @@ if 'trades' not in st.session_state:
 
 if 'show_graphs' not in st.session_state:
     st.session_state.show_graphs = True
-
-if 'show_risk_metrics' not in st.session_state:
-    st.session_state.show_risk_metrics = True
 
 # Callback function to reset trades
 def reset_trades():
@@ -47,14 +43,14 @@ def add_trade():
         })
 
 # Title
-st.title("PKTrades - Manual Backtest PnL Calculator")
+st.title("Enhanced Trading Backtest PnL Calculator")
 
 # Input fields
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     symbol = st.selectbox("Symbol", options=list(TICK_VALUES.keys()), key="symbol")
 with col2:
-    ticks = st.number_input("PnL in Ticks", step=1, help="Enter ticks (positive for profit, negative for loss)", key="ticks")
+    ticks = st.number_input("Ticks", step=1, help="Enter ticks (positive for profit, negative for loss)", key="ticks")
 with col3:
     contracts = st.number_input("Number of Contracts", min_value=1, value=1, step=1, key="contracts")
 with col4:
@@ -63,12 +59,21 @@ with col4:
 # Add Trade button
 st.button("Add Trade", on_click=add_trade)
 
-# Toggle buttons
+# Show Graphs checkbox and Reset button
 col1, col2 = st.columns(2)
 with col1:
     st.session_state.show_graphs = st.checkbox("Show Graphs", value=st.session_state.show_graphs)
-with col2:
-    st.session_state.show_risk_metrics = st.checkbox("Show Risk Metrics", value=st.session_state.show_risk_metrics)
+    
+    # Reset button with confirmation
+    if st.button("Reset All Trades"):
+        st.warning("Are you sure you want to reset all trades? This action cannot be undone.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Yes, reset all trades", key="confirm_reset", on_click=reset_trades):
+                st.success("All trades have been reset.")
+        with col2:
+            if st.button("No, keep my trades", key="cancel_reset"):
+                st.info("Reset cancelled. Your trades are safe.")
 
 # Display content if trades exist
 if st.session_state.trades:
@@ -147,17 +152,6 @@ if st.session_state.trades:
         st.metric("Trade Expectancy", f"${trade_expectancy:.2f}")
         win_rate = len(winning_trades) / len(trades_df) * 100 if len(trades_df) > 0 else 0
         st.metric("Win Rate", f"{win_rate:.2f}%")
-
-# Reset button with confirmation
-if st.button("Reset All Trades"):
-    st.warning("Are you sure you want to reset all trades? This action cannot be undone.")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Yes, reset all trades", key="confirm_reset", on_click=reset_trades):
-            st.success("All trades have been reset.")
-    with col2:
-        if st.button("No, keep my trades", key="cancel_reset"):
-            st.info("Reset cancelled. Your trades are safe.")
 
 # Display a message if no trades exist
 if not st.session_state.trades:
