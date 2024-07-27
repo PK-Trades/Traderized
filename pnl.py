@@ -75,10 +75,17 @@ if st.session_state.trades:
     if not st.session_state.trades:
         st.info("Add trades to see the PnL graph.")
     else:
-        fig = go.Figure(data=[go.Scatter(x=range(1, len(trades_df) + 1), y=trades_df['Cumulative PnL'])])
-        fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
-        fig.add_hline(y=0, line_dash='dash', line_color='red')
-        st.plotly_chart(fig)
+        try:
+            fig = go.Figure(data=[go.Scatter(
+                x=list(range(1, len(trades_df) + 1)),  # Convert range to list
+                y=trades_df['Cumulative PnL'].tolist()  # Convert Series to list
+            )])
+            fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
+            fig.add_hline(y=0, line_dash='dash', line_color='red')
+            st.plotly_chart(fig)
+        except Exception as e:
+            st.error(f"An error occurred while creating the PnL graph: {str(e)}")
+            st.info("Please check your data and try again.")
 
 # Reset button
 if st.button("Reset All Trades"):
