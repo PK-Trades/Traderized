@@ -55,12 +55,13 @@ if st.session_state.trades:
     total_pnl = trades_df['PnL'].sum()
     winning_trades = trades_df[trades_df['PnL'] > 0]
     losing_trades = trades_df[trades_df['PnL'] <= 0]
-    
+   
     st.subheader("Statistics Summary")
     col1, col2 = st.columns(2)
     with col1:
         st.metric("Total PnL", f"${total_pnl:.2f}")
-        st.metric("Win/Loss Ratio", f"{len(winning_trades) / len(losing_trades):.2f}" if len(losing_trades) > 0 else "Infinity")
+        win_rate = len(winning_trades) / len(trades_df) * 100 if trades_df.shape[0] > 0 else 0
+        st.metric("Win Rate", f"{min(win_rate, 100):.2f}%")
         st.metric("Average Winning Trade", f"${winning_trades['PnL'].mean():.2f}" if not winning_trades.empty else "N/A")
         st.metric("Average Losing Trade", f"${losing_trades['PnL'].mean():.2f}" if not losing_trades.empty else "N/A")
     with col2:
