@@ -47,10 +47,26 @@ if st.button("Add Trade"):
     else:
         st.error("Please enter a non-zero tick value.")
 
-# Display trades
+# Display content if trades exist
 if st.session_state.trades:
-    st.subheader("Trades")
     trades_df = pd.DataFrame(st.session_state.trades)
+
+    # PnL Graph (moved above the trades table)
+    st.subheader("PnL Graph")
+    try:
+        fig = go.Figure(data=[go.Scatter(
+            x=list(range(1, len(trades_df) + 1)),
+            y=trades_df['Cumulative PnL'].tolist()
+        )])
+        fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
+        fig.add_hline(y=0, line_dash='dash', line_color='red')
+        st.plotly_chart(fig)
+    except Exception as e:
+        st.error(f"An error occurred while creating the PnL graph: {str(e)}")
+        st.info("Please check your data and try again.")
+
+    # Display trades
+    st.subheader("Trades")
     st.dataframe(trades_df)
 
     # Calculate statistics
@@ -94,20 +110,6 @@ if st.session_state.trades:
         st.metric("Trade Expectancy", f"${trade_expectancy:.2f}")
         win_rate = len(winning_trades) / len(trades_df) * 100 if len(trades_df) > 0 else 0
         st.metric("Win Rate", f"{win_rate:.2f}%")
-
-    # PnL Graph
-    st.subheader("PnL Graph")
-    try:
-        fig = go.Figure(data=[go.Scatter(
-            x=list(range(1, len(trades_df) + 1)),
-            y=trades_df['Cumulative PnL'].tolist()
-        )])
-        fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
-        fig.add_hline(y=0, line_dash='dash', line_color='red')
-        st.plotly_chart(fig)
-    except Exception as e:
-        st.error(f"An error occurred while creating the PnL graph: {str(e)}")
-        st.info("Please check your data and try again.")
 
 # Reset button
 if st.button("Reset All Trades"):
