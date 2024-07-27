@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+import numpy as np
 
 # Constants
 TICK_VALUES = {
@@ -14,8 +17,14 @@ TICK_VALUES = {
 if 'trades' not in st.session_state:
     st.session_state.trades = []
 
+if 'show_graphs' not in st.session_state:
+    st.session_state.show_graphs = True
+
+if 'show_risk_metrics' not in st.session_state:
+    st.session_state.show_risk_metrics = True
+
 # Title
-st.title("Trading Backtest PnL Calculator")
+st.title("Enhanced Trading Backtest PnL Calculator")
 
 # Input fields
 col1, col2 = st.columns(2)
@@ -46,46 +55,106 @@ if st.button("Add Trade"):
     else:
         st.error("Please enter a non-zero tick value.")
 
-# Display trades
+# Toggle buttons
+col1, col2 = st.columns(2)
+with col1:
+    st.session_state.show_graphs = st.checkbox("Show Graphs", value=st.session_state.show_graphs)
+with col2:
+    st.session_state.show_risk_metrics = st.checkbox("Show Risk Metrics", value=st.session_state.show_risk_metrics)
+
+# Display content if trades exist
 if st.session_state.trades:
-    st.subheader("Trades")
     trades_df = pd.DataFrame(st.session_state.trades)
+
+    # Multiple Graphs
+    if st.session_state.show_graphs:
+        st.subheader("Performance Graphs")
+        fig = make_subplots(rows=1, cols=3, subplot_titles=("Cumulative PnL", "Individual Trade PnL", "Win/Loss Distribution"))
+        
+        # Cumulative PnL
+        fig.add_trace(go.Scatter(x=list(range(1, len(trades_df) + 1)), y=trades_df['Cumulative PnL'], name="Cumulative PnL"), row=1, col=1)
+        fig.add_hline(y=0, line_dash='dash', line_color='red', row=1, col=1)
+        
+        # Individual Trade PnL
+        fig.add_trace(go.Bar(x=list(range(1, len(trades_df) + 1)), y=trades_df['PnL'], name="Trade PnL"), row=1, col=2)
+        
+        # Win/Loss Pie Chart
+        win_loss_data = trades_df['PnL'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Break Even'))
+        win_loss_counts = win_loss_data.value_counts()
+        fig.add_trace(go.Pie(labels=win_loss_counts.index, values=win_loss_counts.values, name="Win/Loss Distribution"), row=1, col=3)
+        
+        fig.update_layout(height=500, width=1000, title_text="Trading Performance")
+        st.plotly_chart(fig)
+
+    # Display trades
+    st.subheader("Trades")
     st.dataframe(trades_df)
 
     # Calculate statistics
     total_pnl = trades_df['PnL'].sum()
     winning_trades = trades_df[trades_df['PnL'] > 0]
-    losing_trades = trades_df[trades_df['PnL'] <= 0]
-   
+    losing_trades = trades_df[trades_df['PnL'] < 0]
+    break_even_trades = trades_df[trades_df['PnL'] == 0]
+    
+    # Calculate max consecutive wins and losses
+    trade_results = (trades_df['PnL'] > 0).astype(int).replace(0, -1)
+    trade_streaks = trade_results.groupby((trade_results != trade_results.shift()).cumsum()).cumsum()
+    max_consecutive_wins = trade_streaks.max()
+    max_consecutive_losses = -trade_streaks.min()
+
+    # Calculate Profit Factor and Trade Expectancy
+    total_gross_profit = winning_trades['PnL'].sum()
+    total_gross_loss = abs(losing_trades['PnL'].sum())
+    profit_factor = total_gross_profit / total_gross_loss if total_gross_loss != 0 else float('inf')
+    trade_expectancy = (winning_trades['PnL'].mean() * (len(winning_trades) / len(trades_df))) + \
+                       (losing_trades['PnL'].mean() * (len(losing_trades) / len(trades_df)))
+
     st.subheader("Statistics Summary")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total PnL", f"${total_pnl:.2f}")
-        win_rate = len(winning_trades) / len(trades_df) * 100 if trades_df.shape[0] > 0 else 0
-        st.metric("Win Rate", f"{min(win_rate, 100):.2f}%")
+        st.metric("Total P&L", f"${total_pnl:.2f}")
         st.metric("Average Winning Trade", f"${winning_trades['PnL'].mean():.2f}" if not winning_trades.empty else "N/A")
         st.metric("Average Losing Trade", f"${losing_trades['PnL'].mean():.2f}" if not losing_trades.empty else "N/A")
+        st.metric("Total Number of Trades", len(trades_df))
+        st.metric("Number of Winning Trades", len(winning_trades))
+        st.metric("Number of Losing Trades", len(losing_trades))
     with col2:
-        st.metric("Largest Winning Trade", f"${trades_df['PnL'].max():.2f}")
-        st.metric("Largest Losing Trade", f"${trades_df['PnL'].min():.2f}")
-        st.metric("Total Commission", f"${trades_df['Commission'].sum():.2f}")
+        st.metric("Number of Break Even Trades", len(break_even_trades))
+        st.metric("Max Consecutive Wins", max_consecutive_wins)
+        st.metric("Max Consecutive Losses", max_consecutive_losses)
+        st.metric("Total Commissions", f"${trades_df['Commission'].sum():.2f}")
+        st.metric("Largest Profit", f"${trades_df['PnL'].max():.2f}")
+        st.metric("Largest Loss", f"${trades_df['PnL'].min():.2f}")
+    with col3:
+        st.metric("Average Trade P&L", f"${trades_df['PnL'].mean():.2f}")
+        st.metric("Profit Factor", f"{profit_factor:.2f}")
+        st.metric("Trade Expectancy", f"${trade_expectancy:.2f}")
+        win_rate = len(winning_trades) / len(trades_df) * 100 if len(trades_df) > 0 else 0
+        st.metric("Win Rate", f"{win_rate:.2f}%")
 
-    # PnL Graph
-    st.subheader("PnL Graph")
-    if not st.session_state.trades:
-        st.info("Add trades to see the PnL graph.")
-    else:
-        try:
-            fig = go.Figure(data=[go.Scatter(
-                x=list(range(1, len(trades_df) + 1)),  # Convert range to list
-                y=trades_df['Cumulative PnL'].tolist()  # Convert Series to list
-            )])
-            fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
-            fig.add_hline(y=0, line_dash='dash', line_color='red')
-            st.plotly_chart(fig)
-        except Exception as e:
-            st.error(f"An error occurred while creating the PnL graph: {str(e)}")
-            st.info("Please check your data and try again.")
+    # Risk Metrics
+    if st.session_state.show_risk_metrics:
+        st.subheader("Risk Metrics")
+        
+        # Sharpe Ratio (assuming risk-free rate of 2% annualized)
+        risk_free_rate = 0.02 / 252  # Daily risk-free rate (assuming 252 trading days)
+        returns = trades_df['PnL'].pct_change()
+        sharpe_ratio = (returns.mean() - risk_free_rate) / returns.std() * np.sqrt(252)
+        
+        # Maximum Drawdown
+        cumulative = trades_df['Cumulative PnL']
+        max_drawdown = (cumulative.cummax() - cumulative).max() / cumulative.cummax().max()
+        
+        # Risk-Reward Ratio
+        risk_reward_ratio = abs(winning_trades['PnL'].mean() / losing_trades['PnL'].mean()) if not losing_trades.empty else float('inf')
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}")
+        with col2:
+            st.metric("Maximum Drawdown", f"{max_drawdown:.2%}")
+        with col3:
+            st.metric("Risk-Reward Ratio", f"{risk_reward_ratio:.2f}")
 
 # Reset button
 if st.button("Reset All Trades"):
