@@ -54,7 +54,7 @@ col1, col2, col3, col4 = st.columns(4)
 with col1:
     symbol = st.selectbox("Symbol", options=list(TICK_VALUES.keys()), key="symbol")
 with col2:
-    ticks = st.number_input("Ticks", step=1, help="Enter ticks (positive for profit, negative for loss)", key="ticks")
+    ticks = st.number_input("PnL in Ticks", step=1, help="Enter ticks (positive for profit, negative for loss)", key="ticks")
 with col3:
     contracts = st.number_input("Number of Contracts", min_value=1, value=1, step=1, key="contracts")
 with col4:
