@@ -28,6 +28,11 @@ if 'show_risk_metrics' not in st.session_state:
 if 'show_reset_confirmation' not in st.session_state:
     st.session_state.show_reset_confirmation = False
 
+# Function to reset trades
+def reset_trades():
+    st.session_state.trades = []
+    st.session_state.show_reset_confirmation = False
+
 # Title
 st.title("Enhanced Trading Backtest PnL Calculator")
 
@@ -180,12 +185,13 @@ if st.session_state.show_reset_confirmation:
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Yes, reset all trades", key="confirm_reset"):
-            st.session_state.trades = []
-            st.session_state.show_reset_confirmation = False
+            reset_trades()
             st.success("All trades have been reset.")
-            st.experimental_rerun()
     with col2:
         if st.button("No, keep my trades", key="cancel_reset"):
             st.session_state.show_reset_confirmation = False
             st.info("Reset cancelled. Your trades are safe.")
-            st.experimental_rerun()
+
+# Display a message if no trades exist
+if not st.session_state.trades:
+    st.info("No trades have been added yet. Use the form above to add trades.")
