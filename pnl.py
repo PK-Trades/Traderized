@@ -70,25 +70,30 @@ if st.session_state.trades:
         st.metric("Largest Losing Trade", f"${trades_df['PnL'].min():.2f}")
         st.metric("Total Commission", f"${trades_df['Commission'].sum():.2f}")
 
-    # Create PnL graph
-    if st.session_state.trades:
-        st.subheader("Cumulative PnL Graph")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=list(range(1, len(st.session_state.trades) + 1)),
-            y=[trade['Cumulative PnL'] for trade in st.session_state.trades],
-            mode='lines+markers',
-            name='Cumulative PnL'
-        ))
-        fig.update_layout(
-            title='Cumulative PnL Over Time',
-            xaxis_title='Trade Number',
-            yaxis_title='Cumulative PnL ($)',
-            hovermode='x unified'
-        )
-        st.plotly_chart(fig)
+    # PnL Graph
+    st.subheader("PnL Graph")
+    if not st.session_state.trades:
+        st.info("Add trades to see the PnL graph.")
+    else:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        trades_df = pd.DataFrame(st.session_state.trades)
+        ax.plot(range(1, len(trades_df) + 1), trades_df['Cumulative PnL'], marker='o')
+        ax.set_xlabel('Trade Number')
+        ax.set_ylabel('Cumulative PnL ($)')
+        ax.set_title('Cumulative PnL Over Time')
+        ax.grid(True)
+        
+        # Add horizontal line at y=0
+        ax.axhline(y=0, color='r', linestyle='--')
+        
+        # Customize x-axis ticks
+        ax.set_xticks(range(1, len(trades_df) + 1))
+        
+        st.pyplot(fig)
+
 
 # Reset button
 if st.button("Reset All Trades"):
     st.session_state.trades = []
     st.success("All trades have been reset.")
+    
