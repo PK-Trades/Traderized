@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import numpy as np
 
 # Constants
 TICK_VALUES = {
@@ -55,37 +56,58 @@ if st.session_state.trades:
     # Calculate statistics
     total_pnl = trades_df['PnL'].sum()
     winning_trades = trades_df[trades_df['PnL'] > 0]
-    losing_trades = trades_df[trades_df['PnL'] <= 0]
-   
+    losing_trades = trades_df[trades_df['PnL'] < 0]
+    break_even_trades = trades_df[trades_df['PnL'] == 0]
+    
+    # Calculate max consecutive wins and losses
+    trade_results = (trades_df['PnL'] > 0).astype(int).replace(0, -1)
+    trade_streaks = trade_results.groupby((trade_results != trade_results.shift()).cumsum()).cumsum()
+    max_consecutive_wins = trade_streaks.max()
+    max_consecutive_losses = -trade_streaks.min()
+
+    # Calculate Profit Factor and Trade Expectancy
+    total_gross_profit = winning_trades['PnL'].sum()
+    total_gross_loss = abs(losing_trades['PnL'].sum())
+    profit_factor = total_gross_profit / total_gross_loss if total_gross_loss != 0 else float('inf')
+    trade_expectancy = (winning_trades['PnL'].mean() * (len(winning_trades) / len(trades_df))) + \
+                       (losing_trades['PnL'].mean() * (len(losing_trades) / len(trades_df)))
+
     st.subheader("Statistics Summary")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total PnL", f"${total_pnl:.2f}")
-        win_rate = len(winning_trades) / len(trades_df) * 100 if trades_df.shape[0] > 0 else 0
-        st.metric("Win Rate", f"{min(win_rate, 100):.2f}%")
+        st.metric("Total P&L", f"${total_pnl:.2f}")
         st.metric("Average Winning Trade", f"${winning_trades['PnL'].mean():.2f}" if not winning_trades.empty else "N/A")
         st.metric("Average Losing Trade", f"${losing_trades['PnL'].mean():.2f}" if not losing_trades.empty else "N/A")
+        st.metric("Total Number of Trades", len(trades_df))
+        st.metric("Number of Winning Trades", len(winning_trades))
+        st.metric("Number of Losing Trades", len(losing_trades))
     with col2:
-        st.metric("Largest Winning Trade", f"${trades_df['PnL'].max():.2f}")
-        st.metric("Largest Losing Trade", f"${trades_df['PnL'].min():.2f}")
-        st.metric("Total Commission", f"${trades_df['Commission'].sum():.2f}")
+        st.metric("Number of Break Even Trades", len(break_even_trades))
+        st.metric("Max Consecutive Wins", max_consecutive_wins)
+        st.metric("Max Consecutive Losses", max_consecutive_losses)
+        st.metric("Total Commissions", f"${trades_df['Commission'].sum():.2f}")
+        st.metric("Largest Profit", f"${trades_df['PnL'].max():.2f}")
+        st.metric("Largest Loss", f"${trades_df['PnL'].min():.2f}")
+    with col3:
+        st.metric("Average Trade P&L", f"${trades_df['PnL'].mean():.2f}")
+        st.metric("Profit Factor", f"{profit_factor:.2f}")
+        st.metric("Trade Expectancy", f"${trade_expectancy:.2f}")
+        win_rate = len(winning_trades) / len(trades_df) * 100 if len(trades_df) > 0 else 0
+        st.metric("Win Rate", f"{win_rate:.2f}%")
 
     # PnL Graph
     st.subheader("PnL Graph")
-    if not st.session_state.trades:
-        st.info("Add trades to see the PnL graph.")
-    else:
-        try:
-            fig = go.Figure(data=[go.Scatter(
-                x=list(range(1, len(trades_df) + 1)),  # Convert range to list
-                y=trades_df['Cumulative PnL'].tolist()  # Convert Series to list
-            )])
-            fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
-            fig.add_hline(y=0, line_dash='dash', line_color='red')
-            st.plotly_chart(fig)
-        except Exception as e:
-            st.error(f"An error occurred while creating the PnL graph: {str(e)}")
-            st.info("Please check your data and try again.")
+    try:
+        fig = go.Figure(data=[go.Scatter(
+            x=list(range(1, len(trades_df) + 1)),
+            y=trades_df['Cumulative PnL'].tolist()
+        )])
+        fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
+        fig.add_hline(y=0, line_dash='dash', line_color='red')
+        st.plotly_chart(fig)
+    except Exception as e:
+        st.error(f"An error occurred while creating the PnL graph: {str(e)}")
+        st.info("Please check your data and try again.")
 
 # Reset button
 if st.button("Reset All Trades"):
