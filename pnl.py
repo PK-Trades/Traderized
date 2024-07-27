@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
 import numpy as np
 
 # Constants
@@ -69,22 +68,25 @@ if st.session_state.trades:
     # Multiple Graphs
     if st.session_state.show_graphs:
         st.subheader("Performance Graphs")
-        fig = make_subplots(rows=1, cols=3, subplot_titles=("Cumulative PnL", "Individual Trade PnL", "Win/Loss Distribution"))
         
         # Cumulative PnL
-        fig.add_trace(go.Scatter(x=list(range(1, len(trades_df) + 1)), y=trades_df['Cumulative PnL'], name="Cumulative PnL"), row=1, col=1)
-        fig.add_hline(y=0, line_dash='dash', line_color='red', row=1, col=1)
+        fig_cumulative = go.Figure()
+        fig_cumulative.add_trace(go.Scatter(x=list(range(1, len(trades_df) + 1)), y=trades_df['Cumulative PnL'], name="Cumulative PnL"))
+        fig_cumulative.add_hline(y=0, line_dash='dash', line_color='red')
+        fig_cumulative.update_layout(title="Cumulative PnL", xaxis_title="Trade Number", yaxis_title="Cumulative PnL ($)")
+        st.plotly_chart(fig_cumulative)
         
         # Individual Trade PnL
-        fig.add_trace(go.Bar(x=list(range(1, len(trades_df) + 1)), y=trades_df['PnL'], name="Trade PnL"), row=1, col=2)
+        fig_individual = go.Figure()
+        fig_individual.add_trace(go.Bar(x=list(range(1, len(trades_df) + 1)), y=trades_df['PnL'], name="Trade PnL"))
+        fig_individual.update_layout(title="Individual Trade PnL", xaxis_title="Trade Number", yaxis_title="PnL ($)")
+        st.plotly_chart(fig_individual)
         
         # Win/Loss Pie Chart
         win_loss_data = trades_df['PnL'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Break Even'))
         win_loss_counts = win_loss_data.value_counts()
-        fig.add_trace(go.Pie(labels=win_loss_counts.index, values=win_loss_counts.values, name="Win/Loss Distribution"), row=1, col=3)
-        
-        fig.update_layout(height=500, width=1000, title_text="Trading Performance")
-        st.plotly_chart(fig)
+        fig_pie = px.pie(values=win_loss_counts.values, names=win_loss_counts.index, title="Win/Loss Distribution")
+        st.plotly_chart(fig_pie)
 
     # Display trades
     st.subheader("Trades")
@@ -139,14 +141,14 @@ if st.session_state.trades:
         # Sharpe Ratio (assuming risk-free rate of 2% annualized)
         risk_free_rate = 0.02 / 252  # Daily risk-free rate (assuming 252 trading days)
         returns = trades_df['PnL'].pct_change()
-        sharpe_ratio = (returns.mean() - risk_free_rate) / returns.std() * np.sqrt(252)
+        sharpe_ratio = (returns.mean() - risk_free_rate) / returns.std() * np.sqrt(252) if len(trades_df) > 1 else 0
         
         # Maximum Drawdown
         cumulative = trades_df['Cumulative PnL']
-        max_drawdown = (cumulative.cummax() - cumulative).max() / cumulative.cummax().max()
+        max_drawdown = (cumulative.cummax() - cumulative).max() / cumulative.cummax().max() if len(cumulative) > 0 else 0
         
         # Risk-Reward Ratio
-        risk_reward_ratio = abs(winning_trades['PnL'].mean() / losing_trades['PnL'].mean()) if not losing_trades.empty else float('inf')
+        risk_reward_ratio = abs(winning_trades['PnL'].mean() / losing_trades['PnL'].mean()) if not losing_trades.empty and not winning_trades.empty else 0
         
         col1, col2, col3 = st.columns(3)
         with col1:
