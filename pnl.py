@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 
 # Constants
 TICK_VALUES = {
@@ -68,6 +69,24 @@ if st.session_state.trades:
         st.metric("Largest Winning Trade", f"${trades_df['PnL'].max():.2f}")
         st.metric("Largest Losing Trade", f"${trades_df['PnL'].min():.2f}")
         st.metric("Total Commission", f"${trades_df['Commission'].sum():.2f}")
+
+    # Create PnL graph
+    if st.session_state.trades:
+        st.subheader("Cumulative PnL Graph")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=list(range(1, len(st.session_state.trades) + 1)),
+            y=[trade['Cumulative PnL'] for trade in st.session_state.trades],
+            mode='lines+markers',
+            name='Cumulative PnL'
+        ))
+        fig.update_layout(
+            title='Cumulative PnL Over Time',
+            xaxis_title='Trade Number',
+            yaxis_title='Cumulative PnL ($)',
+            hovermode='x unified'
+        )
+        st.plotly_chart(fig)
 
 # Reset button
 if st.button("Reset All Trades"):
