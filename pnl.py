@@ -47,7 +47,7 @@ def add_trade():
         })
 
 # Title
-st.title("Enhanced Trading Backtest PnL Calculator")
+st.title("PKTrades - Enhanced Trading Backtest PnL Calculator")
 
 # Input fields
 col1, col2, col3, col4 = st.columns(4)
