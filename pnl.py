@@ -101,7 +101,6 @@ if st.session_state.trades:
     st.subheader("Backtesting")
     st.write(strategy)
 
-    # Display trades
     st.subheader("Trades")
     st.dataframe(trades_df)
 
