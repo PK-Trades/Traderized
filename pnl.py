@@ -1,11 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-import backtesting
 
 # Constants
 TICK_VALUES = {
@@ -38,6 +33,7 @@ if st.button("Add Trade"):
         commission_cost = commission * contracts
         pnl = tick_value - commission_cost
         cumulative_pnl = (st.session_state.trades[-1]['Cumulative PnL'] if st.session_state.trades else 0) + pnl
+        
         st.session_state.trades.append({
             "Symbol": symbol,
             "Ticks": ticks,
@@ -50,88 +46,48 @@ if st.button("Add Trade"):
     else:
         st.error("Please enter a non-zero tick value.")
 
-# Display content if trades exist
+# Display trades
 if st.session_state.trades:
-    trades_df = pd.DataFrame(st.session_state.trades)
-
-    # Calculate performance metrics
-    def calculate_sharpe_ratio(returns, risk_free_rate):
-        return (returns.mean() - risk_free_rate) / returns.std()
-
-    def calculate_sortino_ratio(returns, risk_free_rate):
-        return (returns.mean() - risk_free_rate) / returns[returns < 0].std()
-
-    sharpe_ratio_value = calculate_sharpe_ratio(trades_df['PnL'], 0.05)
-    sortino_ratio_value = calculate_sortino_ratio(trades_df['PnL'], 0.05)
-
-    # Create visualizations
-    fig = go.Figure(data=[go.Scatter(x=list(range(1, len(trades_df) + 1)), y=trades_df['Cumulative PnL'].tolist())])
-    fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
-    fig.add_hline(y=0, line_dash='dash', line_color='red')
-    st.plotly_chart(fig)
-
-    # Integrate machine learning model
-    X = trades_df.drop(['Cumulative PnL'], axis=1)
-    y = trades_df['Cumulative PnL']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model = RandomForestClassifier(n_estimators=100)
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-
-    # Integrate backtesting
-    strategy = backtesting.Strategy('MyStrategy', trades_df)
-    strategy.add_indicator(backtesting.indicators.SMA(trades_df['Cumulative PnL'], 50))
-    strategy.add_signal(backtesting.signals.CrossOver(strategy.indicators['SMA'], trades_df['Cumulative PnL']))
-    strategy.add_rule(backtesting.rules.LongEntry(strategy.signals['CrossOver']))
-    strategy.add_rule(backtesting.rules.LongExit(strategy.signals['CrossOver']))
-    strategy.backtest()
-
-    # Display results
-    st.subheader("Performance Metrics")
-    st.metric("Sharpe Ratio", sharpe_ratio_value)
-    st.metric("Sortino Ratio", sortino_ratio_value)
-
-    st.subheader("Visualizations")
-    st.plotly_chart(fig)
-
-    st.subheader("Machine Learning Model")
-    st.metric("Accuracy", accuracy)
-
-    st.subheader("Backtesting")
-    st.write(strategy)
-
     st.subheader("Trades")
+    trades_df = pd.DataFrame(st.session_state.trades)
     st.dataframe(trades_df)
 
     # Calculate statistics
     total_pnl = trades_df['PnL'].sum()
     winning_trades = trades_df[trades_df['PnL'] > 0]
-    losing_trades = trades_df[trades_df['PnL'] < 0]
-    break_even_trades = trades_df[trades_df['PnL'] == 0]
-
-    # Calculate max consecutive wins and losses
-    trade_results = (trades_df['PnL'] > 0).astype(int).replace(0, -1)
-    trade_streaks = trade_results.groupby((trade_results != trade_results.shift()).cumsum()).cumsum()
-    max_consecutive_wins = trade_streaks.max()
-    max_consecutive_losses = -trade_streaks.min()
-
-    # Calculate Profit Factor and Trade Expectancy
-    total_gross_profit = winning_trades['PnL'].sum()
-    total_gross_loss = abs(losing_trades['PnL'].sum())
-    profit_factor = total_gross_profit / total_gross_loss if total_gross_loss != 0 else float('inf')
-    trade_expectancy = (winning_trades['PnL'].mean() * (len(winning_trades) / len(trades_df))) + \
-                       (losing_trades['PnL'].mean() * (len(losing_trades) / len(trades_df)))
-
+    losing_trades = trades_df[trades_df['PnL'] <= 0]
+   
     st.subheader("Statistics Summary")
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
-        st.metric("Total P&L", f"${total_pnl:.2f}")
+        st.metric("Total PnL", f"${total_pnl:.2f}")
+        win_rate = len(winning_trades) / len(trades_df) * 100 if trades_df.shape[0] > 0 else 0
+        st.metric("Win Rate", f"{min(win_rate, 100):.2f}%")
         st.metric("Average Winning Trade", f"${winning_trades['PnL'].mean():.2f}" if not winning_trades.empty else "N/A")
         st.metric("Average Losing Trade", f"${losing_trades['PnL'].mean():.2f}" if not losing_trades.empty else "N/A")
-        st.metric("Total Number of Trades", len(trades_df))
-        st.metric("Number of Winning Trades", len(winning_trades))
-        st.metric("Number of Losing Trades", len(losing_trades))
     with col2:
-        st.metric("Number of Break Even Trades", len(break_even_trades))
-        st.metric("Max Consecutive Wins", max_consecutive_wins)
+        st.metric("Largest Winning Trade", f"${trades_df['PnL'].max():.2f}")
+        st.metric("Largest Losing Trade", f"${trades_df['PnL'].min():.2f}")
+        st.metric("Total Commission", f"${trades_df['Commission'].sum():.2f}")
+
+    # PnL Graph
+    st.subheader("PnL Graph")
+    if not st.session_state.trades:
+        st.info("Add trades to see the PnL graph.")
+    else:
+        try:
+            fig = go.Figure(data=[go.Scatter(
+                x=list(range(1, len(trades_df) + 1)),  # Convert range to list
+                y=trades_df['Cumulative PnL'].tolist()  # Convert Series to list
+            )])
+            fig.update_layout(title='Cumulative PnL Over Time', xaxis_title='Trade Number', yaxis_title='Cumulative PnL ($)')
+            fig.add_hline(y=0, line_dash='dash', line_color='red')
+            st.plotly_chart(fig)
+        except Exception as e:
+            st.error(f"An error occurred while creating the PnL graph: {str(e)}")
+            st.info("Please check your data and try again.")
+
+# Reset button
+if st.button("Reset All Trades"):
+    st.session_state.trades = []
+    st.success("All trades have been reset.")
