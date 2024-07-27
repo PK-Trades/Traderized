@@ -1,99 +1,52 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.graph_objs as go
 
-# Constants
-TICK_VALUES = {
-    "NQ": 5,
-    "ES": 12.5,
-    "YM": 5,
-    "GC": 10
+# Define the symbols and their corresponding tick values
+symbols = {
+    'NQ': 5,
+    'ES': 12.5,
+    'YM': 5,
+    'GC': 10
 }
 
-# Initialize session state variables
-if 'trades' not in st.session_state:
-    st.session_state.trades = []
+# Initialize the trade history and PnL list
+trade_history = []
+pnl_values = []
 
-# Title
-st.title("Trading Backtest PnL Calculator")
+# Create a Streamlit app
+st.title('Trading Backtest PnL Calculator')
 
-# Input fields
-col1, col2 = st.columns(2)
-with col1:
-    symbol = st.selectbox("Symbol", options=list(TICK_VALUES.keys()))
-    ticks = st.number_input("Ticks", step=1, help="Enter ticks (positive for profit, negative for loss)")
-with col2:
-    contracts = st.number_input("Number of Contracts", min_value=1, value=1, step=1)
-    commission = st.number_input("Commission per Contract ($)", min_value=0.0, value=0.0, step=0.01)
+# Symbol selection
+symbol = st.selectbox('Select Symbol', list(symbols.keys()))
 
-# Add Trade button
-if st.button("Add Trade"):
-    if ticks != 0:
-        tick_value = ticks * TICK_VALUES[symbol] * contracts
-        commission_cost = commission * contracts
-        pnl = tick_value - commission_cost
-        cumulative_pnl = (st.session_state.trades[-1]['Cumulative PnL'] if st.session_state.trades else 0) + pnl
-        
-        st.session_state.trades.append({
-            "Symbol": symbol,
-            "Ticks": ticks,
-            "Contracts": contracts,
-            "Commission": commission_cost,
-            "PnL": pnl,
-            "Cumulative PnL": cumulative_pnl
-        })
-        st.success("Trade added successfully!")
-    else:
-        st.error("Please enter a non-zero tick value.")
+# Trade input
+ticks_profit = st.number_input('Ticks Profit', min_value=0)
+ticks_drawdown = st.number_input('Ticks Drawdown', min_value=0)
 
-# Display trades
-if st.session_state.trades:
-    st.subheader("Trades")
-    trades_df = pd.DataFrame(st.session_state.trades)
-    st.dataframe(trades_df)
+# Calculate PnL and update the list
+if st.button('Calculate PnL'):
+    tick_value = symbols[symbol]
+    pnl = (ticks_profit - ticks_drawdown) * tick_value
+    pnl_values.append(pnl)
+    trade_history.append({
+        'symbol': symbol,
+        'ticks_profit': ticks_profit,
+        'ticks_drawdown': ticks_drawdown,
+        'pnl': pnl
+    })
 
-    # Calculate statistics
-    total_pnl = trades_df['PnL'].sum()
-    winning_trades = trades_df[trades_df['PnL'] > 0]
-    losing_trades = trades_df[trades_df['PnL'] <= 0]
-   
-    st.subheader("Statistics Summary")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Total PnL", f"${total_pnl:.2f}")
-        win_rate = len(winning_trades) / len(trades_df) * 100 if trades_df.shape[0] > 0 else 0
-        st.metric("Win Rate", f"{min(win_rate, 100):.2f}%")
-        st.metric("Average Winning Trade", f"${winning_trades['PnL'].mean():.2f}" if not winning_trades.empty else "N/A")
-        st.metric("Average Losing Trade", f"${losing_trades['PnL'].mean():.2f}" if not losing_trades.empty else "N/A")
-    with col2:
-        st.metric("Largest Winning Trade", f"${trades_df['PnL'].max():.2f}")
-        st.metric("Largest Losing Trade", f"${trades_df['PnL'].min():.2f}")
-        st.metric("Total Commission", f"${trades_df['Commission'].sum():.2f}")
+# Display trade history
+st.write('Trade History:')
+for trade in trade_history:
+    st.write(f"{trade['symbol']}: {trade['ticks_profit']} ticks profit, {trade['ticks_drawdown']} ticks drawdown, PnL: ${trade['pnl']:.2f}")
 
-    # PnL Graph
-    st.subheader("PnL Graph")
-    if not st.session_state.trades:
-        st.info("Add trades to see the PnL graph.")
-    else:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        trades_df = pd.DataFrame(st.session_state.trades)
-        ax.plot(range(1, len(trades_df) + 1), trades_df['Cumulative PnL'], marker='o')
-        ax.set_xlabel('Trade Number')
-        ax.set_ylabel('Cumulative PnL ($)')
-        ax.set_title('Cumulative PnL Over Time')
-        ax.grid(True)
-        
-        # Add horizontal line at y=0
-        ax.axhline(y=0, color='r', linestyle='--')
-        
-        # Customize x-axis ticks
-        ax.set_xticks(range(1, len(trades_df) + 1))
-        
-        st.pyplot(fig)
+# Calculate total PnL
+total_pnl = sum(trade['pnl'] for trade in trade_history)
+st.write(f'Total PnL: ${total_pnl:.2f}')
 
+# Create a Plotly figure
+fig = go.Figure(data=[go.Scatter(y=pnl_values)])
 
-# Reset button
-if st.button("Reset All Trades"):
-    st.session_state.trades = []
-    st.success("All trades have been reset.")
-    
+# Display the PnL graph
+st.plotly_chart(fig, use_container_width=True)
