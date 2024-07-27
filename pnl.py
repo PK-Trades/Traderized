@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
-from sklearn.metrics import sharpe_ratio, sortino_ratio
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -56,8 +55,14 @@ if st.session_state.trades:
     trades_df = pd.DataFrame(st.session_state.trades)
 
     # Calculate performance metrics
-    sharpe_ratio_value = sharpe_ratio(trades_df['PnL'], 0.05)
-    sortino_ratio_value = sortino_ratio(trades_df['PnL'], 0.05)
+    def calculate_sharpe_ratio(returns, risk_free_rate):
+        return (returns.mean() - risk_free_rate) / returns.std()
+
+    def calculate_sortino_ratio(returns, risk_free_rate):
+        return (returns.mean() - risk_free_rate) / returns[returns < 0].std()
+
+    sharpe_ratio_value = calculate_sharpe_ratio(trades_df['PnL'], 0.05)
+    sortino_ratio_value = calculate_sortino_ratio(trades_df['PnL'], 0.05)
 
     # Create visualizations
     fig = go.Figure(data=[go.Scatter(x=list(range(1, len(trades_df) + 1)), y=trades_df['Cumulative PnL'].tolist())])
@@ -131,6 +136,3 @@ if st.session_state.trades:
     with col2:
         st.metric("Number of Break Even Trades", len(break_even_trades))
         st.metric("Max Consecutive Wins", max_consecutive_wins)
-        st.metric("Max Consecutive Losses", max_consecutive_losses)
-        st.metric("Total Commissions", f"${trades_df['Commission'].sum():.2f}")
-        st.metric("Largest Profit", f"${trades_df['PnL'].max():.2f}")
