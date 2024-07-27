@@ -148,30 +148,6 @@ if st.session_state.trades:
         win_rate = len(winning_trades) / len(trades_df) * 100 if len(trades_df) > 0 else 0
         st.metric("Win Rate", f"{win_rate:.2f}%")
 
-    # Risk Metrics
-    if st.session_state.show_risk_metrics:
-        st.subheader("Risk Metrics")
-        
-        # Sharpe Ratio (assuming risk-free rate of 2% annualized)
-        risk_free_rate = 0.02 / 252  # Daily risk-free rate (assuming 252 trading days)
-        returns = trades_df['PnL'].pct_change()
-        sharpe_ratio = (returns.mean() - risk_free_rate) / returns.std() * np.sqrt(252) if len(trades_df) > 1 else 0
-        
-        # Maximum Drawdown
-        cumulative = trades_df['Cumulative PnL']
-        max_drawdown = (cumulative.cummax() - cumulative).max() / cumulative.cummax().max() if len(cumulative) > 0 else 0
-        
-        # Risk-Reward Ratio
-        risk_reward_ratio = abs(winning_trades['PnL'].mean() / losing_trades['PnL'].mean()) if not losing_trades.empty and not winning_trades.empty else 0
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}")
-        with col2:
-            st.metric("Maximum Drawdown", f"{max_drawdown:.2%}")
-        with col3:
-            st.metric("Risk-Reward Ratio", f"{risk_reward_ratio:.2f}")
-
 # Reset button with confirmation
 if st.button("Reset All Trades"):
     st.warning("Are you sure you want to reset all trades? This action cannot be undone.")
