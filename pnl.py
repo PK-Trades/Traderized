@@ -25,13 +25,26 @@ if 'show_graphs' not in st.session_state:
 if 'show_risk_metrics' not in st.session_state:
     st.session_state.show_risk_metrics = True
 
-if 'show_reset_confirmation' not in st.session_state:
-    st.session_state.show_reset_confirmation = False
-
-# Function to reset trades
+# Callback function to reset trades
 def reset_trades():
     st.session_state.trades = []
-    st.session_state.show_reset_confirmation = False
+
+# Callback function to add trade
+def add_trade():
+    if st.session_state.ticks != 0:
+        tick_value = st.session_state.ticks * TICK_VALUES[st.session_state.symbol] * st.session_state.contracts
+        commission_cost = st.session_state.commission * st.session_state.contracts
+        pnl = tick_value - commission_cost
+        cumulative_pnl = (st.session_state.trades[-1]['Cumulative PnL'] if st.session_state.trades else 0) + pnl
+        
+        st.session_state.trades.append({
+            "Symbol": st.session_state.symbol,
+            "Ticks": st.session_state.ticks,
+            "Contracts": st.session_state.contracts,
+            "Commission": commission_cost,
+            "PnL": pnl,
+            "Cumulative PnL": cumulative_pnl
+        })
 
 # Title
 st.title("Enhanced Trading Backtest PnL Calculator")
@@ -39,33 +52,16 @@ st.title("Enhanced Trading Backtest PnL Calculator")
 # Input fields
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    symbol = st.selectbox("Symbol", options=list(TICK_VALUES.keys()))
+    symbol = st.selectbox("Symbol", options=list(TICK_VALUES.keys()), key="symbol")
 with col2:
-    ticks = st.number_input("Ticks", step=1, help="Enter ticks (positive for profit, negative for loss)")
+    ticks = st.number_input("Ticks", step=1, help="Enter ticks (positive for profit, negative for loss)", key="ticks")
 with col3:
-    contracts = st.number_input("Number of Contracts", min_value=1, value=1, step=1)
+    contracts = st.number_input("Number of Contracts", min_value=1, value=1, step=1, key="contracts")
 with col4:
-    commission = st.number_input("Commission per Contract ($)", min_value=0.0, value=0.0, step=0.01)
+    commission = st.number_input("Commission per Contract ($)", min_value=0.0, value=0.0, step=0.01, key="commission")
 
 # Add Trade button
-if st.button("Add Trade"):
-    if ticks != 0:
-        tick_value = ticks * TICK_VALUES[symbol] * contracts
-        commission_cost = commission * contracts
-        pnl = tick_value - commission_cost
-        cumulative_pnl = (st.session_state.trades[-1]['Cumulative PnL'] if st.session_state.trades else 0) + pnl
-        
-        st.session_state.trades.append({
-            "Symbol": symbol,
-            "Ticks": ticks,
-            "Contracts": contracts,
-            "Commission": commission_cost,
-            "PnL": pnl,
-            "Cumulative PnL": cumulative_pnl
-        })
-        st.success("Trade added successfully!")
-    else:
-        st.error("Please enter a non-zero tick value.")
+st.button("Add Trade", on_click=add_trade)
 
 # Toggle buttons
 col1, col2 = st.columns(2)
@@ -178,18 +174,13 @@ if st.session_state.trades:
 
 # Reset button with confirmation
 if st.button("Reset All Trades"):
-    st.session_state.show_reset_confirmation = True
-
-if st.session_state.show_reset_confirmation:
     st.warning("Are you sure you want to reset all trades? This action cannot be undone.")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Yes, reset all trades", key="confirm_reset"):
-            reset_trades()
+        if st.button("Yes, reset all trades", key="confirm_reset", on_click=reset_trades):
             st.success("All trades have been reset.")
     with col2:
         if st.button("No, keep my trades", key="cancel_reset"):
-            st.session_state.show_reset_confirmation = False
             st.info("Reset cancelled. Your trades are safe.")
 
 # Display a message if no trades exist
